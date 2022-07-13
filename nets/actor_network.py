@@ -12,7 +12,6 @@ class mySequential(nn.Sequential):
             else:
                 inputs = module(inputs)
         return inputs
-
 class Actor(nn.Module):
 
     def __init__(self,
@@ -70,7 +69,21 @@ class Actor(nn.Module):
         trainable_num = sum(p.numel() for p in self.parameters() if p.requires_grad)
         return {'Total': total_num, 'Trainable': trainable_num}
 
-    def forward(self, problem, x_in, solution, exchange, do_sample = False, fixed_action = None, require_entropy = False, to_critic = False, only_critic  = False):
+    def forward(self, problem, x_in, solution, solution1, exchange, do_sample = False, fixed_action = None, require_entropy = False, to_critic = False, only_critic  = False):
+        """
+
+        :param problem:
+        :param x_in: 输入特征，[batch_size, size, feature_number]
+        :param solution: 解, [batch_size, size]
+        :param solution1: 解1, [batch_size, size]
+        :param exchange:
+        :param do_sample:
+        :param fixed_action:
+        :param require_entropy:
+        :param to_critic:
+        :param only_critic:
+        :return:
+        """
 
         bs, gs, in_d = x_in.size()
         
@@ -100,10 +113,12 @@ class Actor(nn.Module):
             
             # pass through embedder to get embeddings
             NFE, PFE, visited_time = self.embedder(x_in, solution, visited_time = contex)
+            NFE1, PFE1, visited_time = self.embedder(x_in1, solution1, visited_time = contex)
         
         elif problem.NAME == 'tsp':
             # pass through embedder
             NFE, PFE, visited_time = self.embedder(x_in, solution, None)
+            NFE1, PFE1, visited_time = self.embedder(x_in1, solution1, visited_time=contex)
             
             # mask infeasible solutions
             mask_table = problem.get_swap_mask(visited_time).expand(bs, gs, gs).cpu()
@@ -114,7 +129,7 @@ class Actor(nn.Module):
         del visited_time
         
         # pass through DAC encoder
-        h_em, g_em = self.encoder(NFE, PFE)
+        h_em, g_em = self.encoder(NFE, NFE1)
         
         # share embeddings to critic net
         if only_critic:

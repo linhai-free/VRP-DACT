@@ -166,6 +166,7 @@ class PPO:
         
         # get initial solutions
         solutions = move_to(problem.get_initial_solutions(batch), self.opts.device).long()
+        solutions1 = move_to(problem.get_initial_solutions(batch), self.opts.device).long()
         # get initial cost
         obj = problem.get_costs(batch, solutions)
         
@@ -188,6 +189,7 @@ class PPO:
             action = self.actor(problem,
                                   batch_feature,
                                   solutions,
+                                  solutions1,
                                   action,
                                   do_sample = do_sample)[0]
 
@@ -349,6 +351,8 @@ def train_batch(
     # initial solution
     solution = move_to_cuda(problem.get_initial_solutions(batch),rank) if opts.distributed \
                         else move_to(problem.get_initial_solutions(batch), opts.device)
+    solution1 = move_to_cuda(problem.get_initial_solutions(batch),rank) if opts.distributed \
+                        else move_to(problem.get_initial_solutions(batch), opts.device)
     obj = problem.get_costs(batch, solution)
     
     # CL strategy
@@ -371,11 +375,12 @@ def train_batch(
             action = agent.actor( problem,
                                     batch_feature,
                                     solution,
+                                    solution1,
                                     action,
                                     do_sample = True)[0]
              
             # state transient	
-            solution, rewards, obj, solving_state = problem.step(batch, solution, action, obj, solving_state)
+            solution, rewards, obj, solving_state = problem.step(batch, solution, solution1, action, obj, solving_state)
             
             if opts.best_cl:
                 index = obj[:,0] == obj[:,1]
@@ -418,6 +423,7 @@ def train_batch(
             action, log_lh, _to_critic, entro_p  = agent.actor(problem,
                                                                batch_feature,
                                                                solution,
+                                                               solution1,
                                                                action,
                                                                do_sample = True,
                                                                require_entropy = True,
@@ -435,7 +441,7 @@ def train_batch(
             bl_val.append(baseline_val)
                 
             # state transient
-            solution, rewards, obj, solving_state = problem.step(batch, solution, action, obj, solving_state)
+            solution, rewards, obj, solving_state = problem.step(batch, solution, solution1, action, obj, solving_state)
             memory.rewards.append(rewards)
             
             # store info

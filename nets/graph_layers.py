@@ -638,4 +638,4 @@ class EmbeddingNet(nn.Module):
     def forward(self, x, solutions, visited_time = None):
         PFEs, visited_time = self.position_encoding(solutions, self.embedding_dim, visited_time)
         NFEs = self.embedder(x)
-        return  NFEs, PFEs, visited_time
+        return NFEs + PFEs, PFEs, visited_time

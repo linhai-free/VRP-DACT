@@ -212,6 +212,8 @@ class CVRP(object):
             next_state = self.two_opt(rec, first, second)
         elif self.step_method  == 'insert':
             next_state = self.insert(rec, first, second)
+        elif self.step_method  == 'crossover':
+            next_state = self.crossover(rec, first, second)
         else:
             raise NotImplementedError()
         
@@ -287,6 +289,13 @@ class CVRP(object):
     
     
     def swap(self, solution, first_, second_, is_perturb = False):
+        """
+        :param solution: [batch_size, size]
+        :param first_: [batch_size, 1]
+        :param second_: [batch_size, 1]
+        :param is_perturb:
+        :return:
+        """
     
         solution.gather(1,first_)
         
@@ -304,7 +313,56 @@ class CVRP(object):
         rec = self.insert(rec1, second, pre_first, is_perturb)
         
         return rec
-       
+
+
+    def crossover(self, solution1_, solution2_, index1, index2, is_perturb=False):
+        """
+        :param solution1_: [batch_size, size]
+        :param solution2_: [batch_size, size]
+        :param index1: [batch_size, 1]
+        :param index2: [batch_size, 1]
+        :param is_perturb:
+        :return:
+        """
+        batch_size = solution1_.size(0)
+
+        solution1, solution2 = None, None
+        for i in range(batch_size):
+            new_c1, new_c2 = self.single_crossover(solution1_[i], solution2_[i], index1[i], index2[i])
+            if i == 0:
+                solution1, solution2 = new_c1, new_c2
+            else:
+                solution1 = torch.cat((solution1, new_c1), 0)
+                solution2 = torch.cat((solution2, new_c2), 0)
+
+        return solution1, solution2
+
+
+    def single_crossover(self, f1, f2, cro1_index, cro2_index):
+        new_c1_f, new_c1_m, new_c1_b = torch.empty(0), f1[cro1_index:cro2_index + 1], torch.empty(0)
+        new_c2_f, new_c2_m, new_c2_b = torch.empty(0), f2[cro1_index:cro2_index + 1], torch.empty(0)
+        cnt1, cnt2 = 0, 0
+        for index in range(self.size):
+            if cnt1 < cro1_index:
+                if f2[index] not in new_c1_m:
+                    new_c1_f = torch.cat((new_c1_f, f2[index].expand(1)), 0)
+                    cnt1 += 1
+            else:
+                if f2[index] not in new_c1_m:
+                    new_c1_b = torch.cat((new_c1_b, f2[index].expand(1)), 0)
+        for index in range(self.size):
+            if cnt2 < cro1_index:
+                if f1[index] not in new_c2_m:
+                    new_c2_f = torch.cat((new_c2_f, f1[index].expand(1)), 0)
+                    cnt2 += 2
+            else:
+                if f1[index] not in new_c2_m:
+                    new_c2_b = torch.cat((new_c2_b, f1[index].expand(1)), 0)
+        new_c1 = torch.cat((new_c1_f, new_c1_m, new_c1_b), -1)
+        new_c2 = torch.cat((new_c2_f, new_c2_m, new_c2_b), -1)
+        return new_c1.unsqueeze(0), new_c2.unsqueeze(0)
+
+
     def check_feasibility(self, rec, batch):
         
         p_size = self.size
